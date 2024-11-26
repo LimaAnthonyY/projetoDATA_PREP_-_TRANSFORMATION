@@ -1,8 +1,7 @@
-version: '3.8'
 services:
-  postgres:
+  postgres_5432:
     image: postgres:15
-    container_name: olist_postgres
+    container_name: olist_db
     ports:
       - "5432:5432"
     environment:
@@ -10,7 +9,20 @@ services:
       POSTGRES_PASSWORD: password
       POSTGRES_DB: olist_db
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - postgres_data_5432:/var/lib/postgresql/data
+
+  postgres_5433:
+    image: postgres:15
+    container_name: received_db
+    ports:
+      - "5433:5432" 
+    environment:
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: received_db 
+    volumes:
+      - postgres_data_5433:/var/lib/postgresql/data
 
 volumes:
-  postgres_data:
+  postgres_data_5432:
+  postgres_data_5433:

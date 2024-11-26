@@ -1,0 +1,11 @@
+script para criar o transacional
+1 para carregar os dados
+
+1 script para criar o starschema
+1 script para criar o load
+
+1 script para criar o wide
+1 script para criar o load
+
+1 conteiner para rodar os codigos python
+
