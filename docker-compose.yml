@@ -1,5 +1,5 @@
 services:
-  postgres_5432:
+  olist_db:
     image: postgres:15
     container_name: olist_db
     ports:
@@ -9,20 +9,20 @@ services:
       POSTGRES_PASSWORD: password
       POSTGRES_DB: olist_db
     volumes:
-      - postgres_data_5432:/var/lib/postgresql/data
+      - olist_db_data:/var/lib/postgresql/data
 
-  postgres_5433:
+  received_db:
     image: postgres:15
     container_name: received_db
     ports:
-      - "5433:5432" 
+      - "5433:5432"
     environment:
       POSTGRES_USER: user
       POSTGRES_PASSWORD: password
-      POSTGRES_DB: received_db 
+      POSTGRES_DB: received_db
     volumes:
-      - postgres_data_5433:/var/lib/postgresql/data
+      - received_db_data:/var/lib/postgresql/data
 
 volumes:
-  postgres_data_5432:
-  postgres_data_5433:
+  olist_db_data:
+  received_db_data:
