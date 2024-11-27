@@ -398,6 +398,23 @@ Total gasto por cliente:
 PS C:\Users\Anthony\New folder\projetoDATA_PREP_-_TRANSFORMATION> 
 ```
 
+## Permissões
+
+```sql
+GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO "user";
+
+GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO "user";
+
+GRANT CONNECT ON DATABASE olist_db TO "user";
+
+GRANT REFERENCES ON ALL TABLES IN SCHEMA public TO "user";
+
+ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO "user";
+
+CREATE EXTENSION IF NOT EXISTS pgcrypto;
+GRANT EXECUTE ON FUNCTION gen_random_uuid() TO "user";
+```
+
 ## Star Schema e Wide Table
 
 ### Star Schema
@@ -405,19 +422,20 @@ PS C:\Users\Anthony\New folder\projetoDATA_PREP_-_TRANSFORMATION>
 #### Criação da tabela fatos
 
 ```sql
-CREATE TABLE IF NOT EXISTS fact_orders (
-    order_id VARCHAR(32) PRIMARY KEY,
-    customer_id VARCHAR(32),
-    product_id VARCHAR(32),
-    order_timestamp TIMESTAMP,
-    seller_id VARCHAR(32),
-    price NUMERIC,
-    freight_value NUMERIC,
-    order_status VARCHAR(50),
-    FOREIGN KEY (customer_id) REFERENCES dim_customers(customer_id),
-    FOREIGN KEY (product_id) REFERENCES dim_products(product_id),
-    FOREIGN KEY (seller_id) REFERENCES dim_sellers(seller_id)
+CREATE TABLE fact_orders (
+    order_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    customer_id UUID NOT NULL REFERENCES dim_customers(customer_id) ON DELETE CASCADE,
+    product_id UUID NOT NULL REFERENCES dim_products(product_id) ON DELETE CASCADE,
+    order_timestamp TIMESTAMP NOT NULL,
+    seller_id UUID NOT NULL REFERENCES dim_sellers(seller_id) ON DELETE CASCADE,
+    geolocation_id INT REFERENCES dim_geolocation(geolocation_id) ON DELETE SET NULL,
+    payment_value NUMERIC(10, 2) NOT NULL,
+    freight_value NUMERIC(10, 2) NOT NULL,
+    order_status VARCHAR(50) NOT NULL
 );
+
+CREATE INDEX idx_fact_orders_customer_id ON fact_orders (customer_id);
+CREATE INDEX idx_fact_orders_produ
 
 ```
 
@@ -426,12 +444,12 @@ CREATE TABLE IF NOT EXISTS fact_orders (
 ##### **Dimensão de Clientes** :
 
 ```sql
-CREATE TABLE IF NOT EXISTS dim_customers (
-    customer_id VARCHAR(32) PRIMARY KEY,
-    customer_name VARCHAR(255),
-    customer_email VARCHAR(255),
-    customer_state VARCHAR(50),
-    customer_city VARCHAR(255)
+CREATE TABLE dim_customers ( 
+    customer_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    customer_name VARCHAR(255) NOT NULL,
+    customer_email VARCHAR(255) UNIQUE NOT NULL,
+    customer_state CHAR(2) NOT NULL,
+    customer_city VARCHAR(255) NOT NULL
 );
 
 ```
@@ -439,11 +457,12 @@ CREATE TABLE IF NOT EXISTS dim_customers (
 ##### **Dimensão de Produtos** :
 
 ```sql
-CREATE TABLE IF NOT EXISTS dim_products (
-    product_id VARCHAR(32) PRIMARY KEY,
-    product_name VARCHAR(255),
-    product_category_name VARCHAR(255)
+CREATE TABLE dim_products (
+    product_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    product_name VARCHAR(255) NOT NULL,
+    product_category_name VARCHAR(255) NOT NULL
 );
+
 
 ```
 
@@ -463,10 +482,10 @@ CREATE TABLE IF NOT EXISTS dim_time (
 ##### **Dimensão de Vendedores** :
 
 ```sql
-CREATE TABLE IF NOT EXISTS dim_sellers (
-    seller_id VARCHAR(32) PRIMARY KEY,
-    seller_name VARCHAR(255),
-    seller_state VARCHAR(50)
+CREATE TABLE dim_sellers (
+    seller_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    seller_name VARCHAR(255) NOT NULL,
+    seller_state CHAR(2) NOT NULL
 );
 
 ```
@@ -474,12 +493,13 @@ CREATE TABLE IF NOT EXISTS dim_sellers (
 ##### **Dimensão de Geolocalização** :
 
 ```sql
-CREATE TABLE IF NOT EXISTS dim_geolocation (
+CREATE TABLE dim_geolocation (
     geolocation_id SERIAL PRIMARY KEY,
-    geolocation_lat NUMERIC,
-    geolocation_lng NUMERIC,
-    geolocation_state VARCHAR(50),
-    geolocation_city VARCHAR(255)
+    geolocation_lat NUMERIC(9, 6) NOT NULL,
+    geolocation_lng NUMERIC(9, 6) NOT NULL,
+    geolocation_state CHAR(2) NOT NULL,
+    geolocation_city VARCHAR(255) NOT NULL,
+    geolocation_zip_code_prefix VARCHAR(8)
 );
 
 ```
@@ -489,34 +509,39 @@ CREATE TABLE IF NOT EXISTS dim_geolocation (
 #### **SQL para Criar a Wide Table** :
 
 ```sql
-CREATE TABLE IF NOT EXISTS wide_table AS
-SELECT 
-    o.order_id,
-    c.customer_id,
-    c.customer_city,  -- Usando 'customer_city' já que 'customer_name' não existe
-    c.customer_state,  -- Usando 'customer_state'
-    p.product_id,
-    oi.price,
-    oi.freight_value,
-    s.seller_id,
-    g.geolocation_lat,
-    g.geolocation_lng,
-    op.payment_value,  -- Correção para 'payment_value' da tabela 'order_payments'
-    o.order_status,
-    r.review_score,
-    r.review_comment_message,
-    o.order_purchase_timestamp
-FROM orders o
-JOIN customers c ON o.customer_id = c.customer_id
-JOIN order_items oi ON o.order_id = oi.order_id
-JOIN products p ON oi.product_id = p.product_id  -- Junção com a tabela de produtos
-JOIN sellers s ON oi.seller_id = s.seller_id
-JOIN geolocation g ON c.customer_zip_code_prefix = g.geolocation_zip_code_prefix
-JOIN order_payments op ON o.order_id = op.order_id
-JOIN order_reviews r ON o.order_id = r.order_id;
+CREATE TABLE wide_table (
+    order_id UUID PRIMARY KEY, -- Chave primária para o pedido
+    customer_id UUID NOT NULL, -- ID do cliente
+    customer_name VARCHAR(255) NOT NULL, -- Nome do cliente
+    customer_email VARCHAR(255) NOT NULL UNIQUE, -- E-mail único do cliente
+    customer_state CHAR(2) NOT NULL, -- Estado do cliente (2 caracteres)
+    customer_city VARCHAR(255) NOT NULL, -- Cidade do cliente
+    product_id UUID NOT NULL, -- ID do produto
+    product_name VARCHAR(255) NOT NULL, -- Nome do produto
+    product_category_name VARCHAR(255) NOT NULL, -- Categoria do produto
+    price NUMERIC(10, 2) NOT NULL, -- Preço do produto
+    freight_value NUMERIC(10, 2) NOT NULL, -- Valor do frete
+    seller_id UUID NOT NULL, -- ID do vendedor
+    seller_name VARCHAR(255) NOT NULL, -- Nome do vendedor
+    geolocation_id INT, -- ID da geolocalização (referência à tabela dim_geolocation)
+    payment_value NUMERIC(10, 2) NOT NULL, -- Valor do pagamento
+    order_status VARCHAR(50) NOT NULL DEFAULT 'pending', -- Status do pedido (com valor padrão)
+    order_purchase_timestamp TIMESTAMP NOT NULL, -- Data de compra do pedido
+    review_score SMALLINT CHECK (review_score >= 1 AND review_score <= 5), -- Nota de avaliação (restrição de 1 a 5)
+    review_comment_message TEXT, -- Comentário de avaliação
+    order_delivered_customer_date TIMESTAMP, -- Data de entrega do pedido ao cliente
 
+    CONSTRAINT fk_customer FOREIGN KEY (customer_id) REFERENCES dim_customers(customer_id) ON DELETE CASCADE,
+    CONSTRAINT fk_product FOREIGN KEY (product_id) REFERENCES dim_products(product_id) ON DELETE CASCADE,
+    CONSTRAINT fk_seller FOREIGN KEY (seller_id) REFERENCES dim_sellers(seller_id) ON DELETE CASCADE,
+    CONSTRAINT fk_geolocation FOREIGN KEY (geolocation_id) REFERENCES dim_geolocation(geolocation_id) ON DELETE SET NULL
+);
+
+CREATE INDEX idx_wide_table_customer_id ON wide_table (customer_id);
+CREATE INDEX idx_wide_table_product_id ON wide_table (product_id);
+CREATE INDEX idx_wide_table_seller_id ON wide_table (seller_id);
+CREATE INDEX idx_wide_table_geolocation_id ON wide_table (geolocation_id);
+CREATE INDEX idx_wide_table_order_status ON wide_table (order_status);
+CREATE INDEX idx_wide_table_order_purchase_timestamp ON wide_table (order_purchase_timestamp);
 ```
-
-
-
-## O
+## 
