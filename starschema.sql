@@ -1,4 +1,4 @@
-CREATE TABLE dim_customers (
+CREATE TABLE dim_customers ( 
     customer_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     customer_name VARCHAR(255) NOT NULL,
     customer_email VARCHAR(255) UNIQUE NOT NULL,
@@ -11,7 +11,8 @@ CREATE TABLE dim_geolocation (
     geolocation_lat NUMERIC(9, 6) NOT NULL,
     geolocation_lng NUMERIC(9, 6) NOT NULL,
     geolocation_state CHAR(2) NOT NULL,
-    geolocation_city VARCHAR(255) NOT NULL
+    geolocation_city VARCHAR(255) NOT NULL,
+    geolocation_zip_code_prefix VARCHAR(8)
 );
 
 CREATE TABLE dim_products (
@@ -50,12 +51,4 @@ CREATE TABLE fact_orders (
 );
 
 CREATE INDEX idx_fact_orders_customer_id ON fact_orders (customer_id);
-CREATE INDEX idx_fact_orders_product_id ON fact_orders (product_id);
-CREATE INDEX idx_fact_orders_seller_id ON fact_orders (seller_id);
-CREATE INDEX idx_fact_orders_geolocation_id ON fact_orders (geolocation_id);
-CREATE INDEX idx_fact_orders_order_timestamp ON fact_orders (order_timestamp);
-
-CREATE INDEX idx_dim_customers_customer_state ON dim_customers (customer_state);
-CREATE INDEX idx_dim_geolocation_geolocation_state ON dim_geolocation (geolocation_state);
-CREATE INDEX idx_dim_sellers_seller_state ON dim_sellers (seller_state);
-CREATE INDEX idx_dim_time_date_actual ON dim_time (date_actual);
+CREATE INDEX idx_fact_orders_produ
